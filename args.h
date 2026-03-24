@@ -13,6 +13,7 @@ typedef struct{
 
 int parse_args(int argc, char **argv, args_struct *args);
 int is_number(const char *argument);
+int parse_ports(const char *ports_string, int **ports, int *count);
 void print_help();
 
 #endif

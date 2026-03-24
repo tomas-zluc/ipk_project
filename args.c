@@ -4,6 +4,8 @@
 #include "args.h"
 
 #define BASE_TIMEOUT 1000
+#define MAX_PORT 65535
+#define INITIAL_PORT_CAPACITY 32
 
 int parse_args(int argc, char **argv, args_struct *args){
     memset(args, 0, sizeof(args_struct));
@@ -92,6 +94,84 @@ int is_number(const char *argument) {
         }
     }
     return 1;
+}
+
+
+int parse_ports(const char *ports_string, int **ports, int *count){
+    if(!ports_string){
+        return 1;
+    }
+
+    char *copy = malloc(strlen(ports_string) + 1);
+    if (!copy) {
+        return 1;
+    }
+    strcpy(copy, ports_string);
+
+    int capacity = INITIAL_PORT_CAPACITY;
+    int *result = malloc(capacity * sizeof(int));
+    if(!result){
+        free(copy);
+        return 1;
+    }
+
+    int n = 0;
+
+    char *token = strtok(copy, ",");
+
+    while(token){
+        int start, end;
+
+        //Parsing port range
+        if(sscanf(token, "%d-%d", &start, &end) == 2){
+            if(start>end || start <= 0 || end >= MAX_PORT){
+                free(result);
+                free(copy);
+                fprintf(stderr, "ERROR: Incorrect port range");
+                return 1;
+            }
+
+            for (int p = start; p <= end; p++) {
+                if (n >= capacity) {
+                    capacity *= 2;
+                    result = realloc(result, capacity * sizeof(int));
+                }
+                result[n++] = p;
+            }
+        }
+
+        //Parsing singe port
+        else if(sscanf(token, "%d", &start) == 1){
+            if(start <= 0 || start >= MAX_PORT){
+                free(result);
+                free(copy);
+                fprintf(stderr, "ERROR: Incorrect port range");
+                return 1;
+            }
+
+            if(n >= capacity){
+                capacity *= 2;
+                result = realloc(result, capacity * sizeof(int));
+            }
+
+            result[n++] = start;
+        }
+        
+        else {
+            free(result);
+            free(copy);
+            return 1;
+        }
+
+        token = strtok(NULL, ",");
+
+    }
+
+    *ports = result;
+    *count = n;
+
+    free(copy);
+    return 0;
 }
 
 //Prints usage of this program
