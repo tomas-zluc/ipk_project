@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include "args.h"
+#include "dns.h"
 
 int main(int argc, char **argv){
     args_struct args;
@@ -22,6 +23,16 @@ int main(int argc, char **argv){
     if(!args.interface || !args.hostname){
         fprintf(stderr, "Error: Missing required arguments! (interface or hostname) \n");
         return 1;
+    }
+
+    dns_results result_addresses = {0};
+
+    if(resolve_host(args.hostname, &result_addresses)){
+        return 1;
+    }
+
+    for(int i = 0; i < result_addresses.count; i++){
+        printf("Address #%d - %s\n", result_addresses.count, result_addresses.addrs[i]);
     }
 
     //to do: scan TCP ports
