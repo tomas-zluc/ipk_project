@@ -1,11 +1,12 @@
-#define _POSIX_C_SOURCE 200112L
-
 #include "dns.h"
 #include <stdio.h>
 #include <string.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>
+#include <ifaddrs.h>
+#include <arpa/inet.h>
+#include <net/if.h>
 
 
 int resolve_host(const char *host, dns_results *results){
@@ -47,5 +48,70 @@ int addr_exists(dns_results *results, const char *addr) {
             return 1;
         }
     }
+    return 0;
+}
+
+int resolve_interface(const char *if_name, char *ip_buffer){
+    struct ifaddrs *ifaddr, *ifa;
+
+    if (getifaddrs(&ifaddr) == -1) {
+        return -1;
+    }
+
+    for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
+
+        if (!ifa->ifa_addr){
+            continue;
+        }
+
+        if (strcmp(ifa->ifa_name, if_name) != 0){
+            continue;
+        }
+
+        if (ifa->ifa_addr->sa_family == AF_INET) {
+            struct sockaddr_in *sa = (struct sockaddr_in *)ifa->ifa_addr;
+            inet_ntop(AF_INET, &sa->sin_addr, ip_buffer, INET_ADDRSTRLEN);
+            freeifaddrs(ifaddr);
+            return 0;
+        }
+    }
+
+    freeifaddrs(ifaddr);
+    return -1;
+}
+
+int list_interfaces() {
+    struct ifaddrs *ifaddr, *ifa;
+
+    if (getifaddrs(&ifaddr) == -1) {
+        perror("getifaddrs");
+        return 1;
+    }
+
+    for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
+
+        if (!ifa->ifa_name || !ifa->ifa_addr){
+            continue;
+        }
+
+        if (!(ifa->ifa_flags & IFF_UP)){
+            continue;
+        }
+
+        //avoiding duplicates
+        int printed = 0;
+        for (struct ifaddrs *tmp = ifaddr; tmp != ifa; tmp = tmp->ifa_next) {
+            if (tmp->ifa_name && strcmp(tmp->ifa_name, ifa->ifa_name) == 0) {
+                printed = 1;
+                break;
+            }
+        }
+
+        if (!printed) {
+            printf("%s\n", ifa->ifa_name);
+        }
+    }
+
+    freeifaddrs(ifaddr);
     return 0;
 }

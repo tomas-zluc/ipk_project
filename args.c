@@ -78,6 +78,11 @@ int parse_args(int argc, char **argv, args_struct *args){
 
     }
 
+    if(!args->interface || !args->hostname){
+        fprintf(stderr, "Error: Missing required arguments! (interface or hostname) \n");
+        return 1;
+    }
+
     return 0;
 
 }
@@ -127,7 +132,6 @@ int parse_ports(const char *ports_string, int **ports, int *count){
             if(start>end || start <= 0 || end >= MAX_PORT){
                 free(result);
                 free(copy);
-                fprintf(stderr, "ERROR: Incorrect port range");
                 return 1;
             }
 
@@ -145,7 +149,6 @@ int parse_ports(const char *ports_string, int **ports, int *count){
             if(start <= 0 || start >= MAX_PORT){
                 free(result);
                 free(copy);
-                fprintf(stderr, "ERROR: Incorrect port range");
                 return 1;
             }
 

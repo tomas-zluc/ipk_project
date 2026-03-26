@@ -11,5 +11,7 @@ typedef struct{
 
 int resolve_host(const char *host, dns_results *results);
 int addr_exists(dns_results *results, const char *addr);
+int resolve_interface(const char *if_name, char *ip_buffer);
+int list_interfaces();
 
 #endif
