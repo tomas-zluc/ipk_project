@@ -75,16 +75,13 @@ int parse_args(int argc, char **argv, args_struct *args){
             }
             args->hostname = argv[i];
         }
-
     }
 
     if(!args->interface || !args->hostname){
         fprintf(stderr, "Error: Missing required arguments! (interface or hostname) \n");
         return 1;
     }
-
     return 0;
-
 }
 
 //Helper function to check if provided argument is an integer

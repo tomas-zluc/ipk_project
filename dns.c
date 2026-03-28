@@ -8,14 +8,13 @@
 #include <arpa/inet.h>
 #include <net/if.h>
 
-
 int resolve_host(const char *host, dns_results *results){
     struct addrinfo *addr_info_res;
     int res_status;
 
     //Gets the address info from provided hostname
     res_status = getaddrinfo(host, NULL, NULL, &addr_info_res);
-
+    
     if(res_status){
         fprintf(stderr, "Error: DNS resolution failed. \n");
         return 1;
