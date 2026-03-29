@@ -13,7 +13,7 @@ struct pseudo_header {
 
 unsigned short ip_checksum(unsigned short *buf, int len);
 unsigned short ip_checksum(unsigned short *buf, int len);
-int scan_tcp_ports(int *ports, int port_count, const char *host_ip, const char *interface_ip, int timeout);
+int scan_tcp_ports(int *ports, int port_count, const char *host_ip, const char *interface_ip, int timeout, const char *interface_name);
 int scan_udp_ports(int *ports, int port_count, const char *host_ip, const char *interface_ip, int timeout);
 
 #endif

@@ -54,7 +54,7 @@ unsigned short tcp_checksum(struct iphdr *ip_header, struct tcphdr *tcp_header) 
     return result;
 }
 
-int scan_tcp_ports(int *ports, int port_count, const char *host_ip, const char *interface_ip, int timeout){
+int scan_tcp_ports(int *ports, int port_count, const char *host_ip, const char *interface_ip, int timeout, const char *interface_name){
 
     //Only for now - gets rid of IPv6
     int is_ipv6 = strchr(host_ip, ':') != NULL;
@@ -123,17 +123,109 @@ int scan_tcp_ports(int *ports, int port_count, const char *host_ip, const char *
     tcp_header->urg_ptr = 0;
     tcp_header->check = 0; //Same with IP, has to be filled with 0 before calculating checksum
 
-    for(int i = 0; i < port_count; i++){
-        tcp_header->dest = htons(ports[i]);
-        tcp_header->check = tcp_checksum(ip_header, tcp_header);
-        if(sendto(raw_sock, packet, sizeof(struct iphdr) + sizeof(struct tcphdr), 0, (struct sockaddr *)&target, sizeof(target)) < 0){
-            fprintf(stderr, "Error: Problem with sending TCP packet. \n");
-            close(raw_sock);
-            return 1;
-        }
-        printf("Scanning port %d for TCP socket from interface %s on host %s with %dms timeout\n", ports[i], interface_ip, host_ip, timeout);
+    //open pcap
+    char errbuf[PCAP_ERRBUF_SIZE];
+    pcap_t *handle = pcap_open_live(interface_name, BUFSIZ, 1, timeout, errbuf);
+    if (!handle) {
+        fprintf(stderr, "ERROR: pcap_open_live failed: %s\n", errbuf);
+        return 1;
     }
 
+    //Find link offset
+    int link_type = pcap_datalink(handle);
+    int link_offset;
+
+    switch (link_type) {
+        case DLT_EN10MB:
+            link_offset = 14;
+            break;
+        case DLT_NULL:      // loopback (Linux/macOS)
+        case DLT_LOOP:
+            link_offset = 4;
+            break;
+        default:
+            fprintf(stderr, "Unsupported datalink type: %d\n", link_type);
+            return 1;
+    }
+
+    //set pcap filters
+    struct bpf_program fp;
+    char filter_exp[256];
+    snprintf(filter_exp, sizeof(filter_exp), "tcp and src host %s", host_ip);
+    
+    if (pcap_compile(handle, &fp, filter_exp, 0, PCAP_NETMASK_UNKNOWN) == -1) {
+        fprintf(stderr, "pcap_compile failed\n");
+        return 1;
+    }
+
+    if (pcap_setfilter(handle, &fp) == -1) {
+        fprintf(stderr, "pcap_setfilter failed\n");
+        return 1;
+    }
+
+    //Loops over every port
+    for(int i = 0; i < port_count; i++) {
+
+        int status = 0; // 0 = unknown, 1 = open, 2 = closed
+
+        //In case a response packet is not received the firts time, SYN packet is sent a second time
+        for (int attempt = 0; attempt < 2; attempt++) {
+            //Sends SYN packet
+            tcp_header->dest = htons(ports[i]);
+            tcp_header->check = 0;
+            tcp_header->check = tcp_checksum(ip_header, tcp_header);
+
+            if(sendto(raw_sock, packet, sizeof(packet), 0, (struct sockaddr *)&target, sizeof(target)) < 0){
+                continue;
+            }
+
+            //Keeps checking for a response, until timeout
+            time_t start = time(NULL);
+            while (time(NULL) - start < timeout / 1000) {
+
+                struct pcap_pkthdr *header;
+                const u_char *response;
+
+                int res = pcap_next_ex(handle, &header, &response);
+                if (res != 1) {
+                    continue
+                };
+
+                struct iphdr *ip_resp = (struct iphdr *)(response + link_offset);
+                struct tcphdr *tcp_resp = (struct tcphdr *)(response + link_offset + ip_resp->ihl * 4);
+
+                int src_port = ntohs(tcp_resp->source);
+                int dst_port = ntohs(tcp_resp->dest);
+
+                if (src_port != ports[i] || dst_port != SRC_PORT) {
+                    continue;
+                }
+
+                if (tcp_resp->syn && tcp_resp->ack) {
+                    status = 1; // OPEN
+                    break;
+                } else if (tcp_resp->rst) {
+                    status = 2; // CLOSED
+                    break;
+                }
+            }
+
+            //If response is received, don´t retry
+            if (status != 0){
+                break;
+            };
+        }
+
+        if (status == 1) {
+            printf("%s %d tcp OPEN\n", host_ip, ports[i]);
+        } else if (status == 2) {
+            printf("%s %d tcp CLOSED\n", host_ip, ports[i]);
+        } else {
+            printf("%s %d tcp FILTERED\n", host_ip, ports[i]);
+        }
+    }
+
+    pcap_close(handle);
     close(raw_sock);
     return 0;
 }

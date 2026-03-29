@@ -38,7 +38,7 @@ int main(int argc, char **argv){
         fprintf(stderr, "Error: Could not get IP of interface %s\n", args.interface);
         return 1;
     }
-    
+
     if(args.tcp_ports){
         int *tcp_ports;
         int tcp_count;
@@ -50,7 +50,7 @@ int main(int argc, char **argv){
         }
 
         for(int i = 0; i < result_addresses.count; i++){
-            scan_tcp_ports(tcp_ports, tcp_count, result_addresses.addrs[i], source_ip, args.timeout);
+            scan_tcp_ports(tcp_ports, tcp_count, result_addresses.addrs[i], source_ip, args.timeout, args.interface);
         }
 
         free(tcp_ports);
